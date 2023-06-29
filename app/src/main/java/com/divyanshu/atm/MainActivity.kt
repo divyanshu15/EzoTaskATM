@@ -13,6 +13,7 @@ import java.util.Date
 import java.util.Locale
 import android.content.Context
 import android.content.SharedPreferences
+import java.lang.Integer.min
 
 class MainActivity : AppCompatActivity() {
     private lateinit var transactionRecordsTextView: TextView
@@ -146,31 +147,48 @@ class MainActivity : AppCompatActivity() {
         val count200Value = count200.text.toString().toInt()
         val count100Value = count100.text.toString().toInt()
 
-        val remaining2000 = count2000Value - (withdrawAmountValue / 2000)
-        val remaining500 = count500Value - ((withdrawAmountValue % 2000) / 500)
-        val remaining200 = count200Value - (((withdrawAmountValue % 2000) % 500) / 200)
-        val remaining100 = count100Value - ((((withdrawAmountValue % 2000) % 500) % 200) / 100)
+        val availableBalance =
+            (count2000Value * 2000) + (count500Value * 500) + (count200Value * 200) + (count100Value * 100)
 
-        val isValidAmount = (withdrawAmountValue % 2000 == 0 && remaining2000 >= 0) ||
-                (withdrawAmountValue % 500 == 0 && remaining500 >= 0) ||
-                (withdrawAmountValue % 200 == 0 && remaining200 >= 0) ||
-                (withdrawAmountValue % 100 == 0 && remaining100 >= 0)
+        if (withdrawAmountValue <= availableBalance) {
+            val remaining2000 = min(withdrawAmountValue / 2000, count2000Value)
+            val remainingAmountAfter2000 = withdrawAmountValue - (remaining2000 * 2000)
 
-        if (isValidAmount) {
-            count2000.text = remaining2000.toString()
-            count500.text = remaining500.toString()
-            count200.text = remaining200.toString()
-            count100.text = remaining100.toString()
+            val remaining500 = min(remainingAmountAfter2000 / 500, count500Value)
+            val remainingAmountAfter500 = remainingAmountAfter2000 - (remaining500 * 500)
 
-            updateTotalCount()
-            recordTransaction("Withdraw: $withdrawAmountValue")
+            val remaining200 = min(remainingAmountAfter500 / 200, count200Value)
+            val remainingAmountAfter200 = remainingAmountAfter500 - (remaining200 * 200)
+
+            val remaining100 = min(remainingAmountAfter200 / 100, count100Value)
+
+            val totalWithdrawnAmount =
+                (remaining2000 * 2000) + (remaining500 * 500) + (remaining200 * 200) + (remaining100 * 100)
+
+            if (totalWithdrawnAmount == withdrawAmountValue) {
+                count2000.text = (count2000Value - remaining2000).toString()
+                count500.text = (count500Value - remaining500).toString()
+                count200.text = (count200Value - remaining200).toString()
+                count100.text = (count100Value - remaining100).toString()
+
+                updateTotalCount()
+                recordTransaction("Withdraw: $withdrawAmountValue")
+            } else {
+                Toast.makeText(
+                    this,
+                    "Cannot withdraw the exact amount. Please enter a different amount.",
+                    Toast.LENGTH_SHORT
+                ).show()
+                recordTransaction("Failed Transaction (cannot withdraw exact amount)")
+            }
         } else {
-            Toast.makeText(this, "Invalid amount. Please enter a valid amount.", Toast.LENGTH_SHORT)
-                .show()
-            recordTransaction("Failed Transaction(invalid amount)")
+            Toast.makeText(this, "Insufficient balance. Please enter a lower amount.", Toast.LENGTH_SHORT).show()
+            recordTransaction("Failed Transaction (insufficient balance)")
         }
+
         dialog.dismiss()
     }
+
 
     private fun recordTransaction(transactionResult: String) {
         val timestamp =
